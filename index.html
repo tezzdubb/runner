@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ADHD dopamine generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* 
+      #backgroundVideo: An iframe used for the normal Brain Rot Mode background.
+      It remains hidden until Brain Rot Mode is enabled.
+    */
+    #backgroundVideo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1; /* behind main content */
+      pointer-events: none;
+      border: none;
+      display: none;
+    }
+    /* 
+      #superBackground: A container div used for Super Brainrot Mode.
+      When activated, it becomes a 2x2 grid holding four video iframes.
+    */
+    #superBackground {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2; /* behind the normal Brain Rot Mode */
+      display: none; /* hidden by default */
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+    /* 
+      Global styles for body ensure a centered layout with a dark background
+      to complement the video backgrounds.
+    */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      position: relative;
+    }
+    /* 
+      .container: Main panel holding all UI controls.
+      It has an opaque white background by default and transitions to a 
+      more transparent background when either Brain Rot mode is active.
+    */
+    .container {
+      position: relative;
+      background-color: rgba(255, 255, 255, 0.95); /* opaque by default */
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      margin: 1rem;
+      overflow: hidden;
+      z-index: 1;
+      transition: background-color 0.3s ease;
+    }
+    /* Increased text sizes by ~20% for better readability */
+    h1 {
+      margin-bottom: 1rem;
+      font-size: 1.8rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 1.08rem;
+    }
+    /* 
+      Inputs and dropdowns are used for the time input and interval selection.
+      Their font sizes have been increased.
+    */
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    /* 
+      .add-time-container holds the buttons for adding time.
+    */
+    .add-time-container {
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .add-time-container button {
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      border: none;
+      background-color: #28a745;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* 
+      .speed-container holds the new speed input (in km/h).
+    */
+    .speed-container {
+      margin-bottom: 1rem;
+    }
+    .speed-container label {
+      font-size: 1.08rem;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    .speed-container input {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    /* 
+      Dropdown label for the interval selection.
+    */
+    .dropdown-label {
+      margin-bottom: 0.5rem;
+      font-size: 1.08rem;
+    }
+    /* 
+      .button-container holds the Start, Pause, and Reset buttons.
+    */
+    .button-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      border: none;
+      background-color: #007BFF;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+    /* 
+      Mode toggle buttons: Brain Rot and Super Brainrot.
+    */
+    #brainRotButton {
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      background-color: #ff4081;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #superBrainRotButton {
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      background-color: #ff9800;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* 
+      Timer display styling.
+    */
+    #timerDisplay {
+      font-size: 2.4rem;
+      margin-top: 1rem;
+    }
+    /* 
+      Distance display shows the live computed distance.
+    */
+    #distanceDisplay {
+      font-size: 1.8rem;
+      margin-top: 0.5rem;
+    }
+    /* 
+      Charts container and captions.
+    */
+    .charts-container {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .chart-wrapper {
+      margin: 0.5rem;
+      text-align: center;
+    }
+    .chart-caption {
+      margin-top: 0.5rem;
+      font-size: 1.08rem;
+    }
+    .pie-chart {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: conic-gradient(#ddd 0deg, #ddd 360deg);
+      margin: 0 auto;
+      position: relative;
+    }
+    /* 
+      Scoreboard numbers (for interval progress) with text shadow.
+    */
+    #overallPie .score {
+      position: absolute;
+      color: #fff;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px #000;
+    }
+    #completedScore {
+      left: 25%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #remainingScore {
+      right: 25%;
+      top: 50%;
+      transform: translate(50%, -50%);
+    }
+    /* 
+      Motivational message overlay styling.
+    */
+    #motivationalMessage {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.98);
+      padding: 30px 40px;
+      border-radius: 10px;
+      font-size: 3.6rem;
+      font-weight: bold;
+      color: #333;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      z-index: 100;
+      max-width: 90%;
+      text-align: center;
+      pointer-events: none; /* Allow clicks to pass through when invisible */
+      display: none; /* Start hidden */
+    }
+    #motivationalStats {
+      font-size: 1.8rem;
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+    }
+    /* 
+      Fireworks and emoji animation for motivational messages.
+    */
+    .firework {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: fireworks 1.5s ease-out forwards;
+    }
+    .emoji-firework {
+      background: transparent;
+      font-size: 24px;
+    }
+    @keyframes fireworks {
+      0% { transform: scale(0); opacity: 1; }
+      80% { transform: scale(1.5); opacity: 0.7; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+    /* Styles for Saved Runs Section */
+    #savedRunsContainer {
+      margin: 1rem auto;
+      max-width: 600px;
+      padding: 1rem;
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    /* Styles for the saved runs table */
+    #savedRunsTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    #savedRunsTable, #savedRunsTable th, #savedRunsTable td {
+      border: 1px solid #ccc;
+    }
+    #savedRunsTable th, #savedRunsTable td {
+      padding: 0.5rem;
+      text-align: center;
+    }
+    /* Trash icon initially hidden and centered */
+    .delete-icon {
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: inline-block;
+    }
+    /* When the row is activated (clicked), show the delete icon */
+    tr.show-delete .delete-icon {
+      opacity: 1;
+    }
+    /* Saved Runs Modal Overlay */
+    #savedRunsOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000;
+      display: none;  /* Hidden by default */
+      overflow: auto;
+    }
+    #savedRunsModal {
+      background: #fff;
+      margin: 5% auto;
+      padding: 1rem;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      position: relative;
+    }
+    #savedRunsModal #closeSavedRunsButton {
+      position: absolute;
+      top: 10px;
+      left: 50%;  /* Center horizontally */
+      transform: translateX(-50%);  /* Adjust to center exactly */
+      background-color: #dc3545;
+      border: none;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    #savedRunsContent {
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Normal Brain Rot Mode background (hidden by default) -->
+  <iframe id="backgroundVideo" allow="autoplay; encrypted-media" allowfullscreen playsinline></iframe>
+  
+  <!-- Super Brainrot Mode container (hidden by default) -->
+  <div id="superBackground"></div>
+  
+  <!-- Main panel container -->
+  <div class="container" id="mainContainer">
+    <h1>ADHD dopamine generator</h1>
+    <!-- Mode toggle buttons -->
+    <button id="brainRotButton">🤪 Enable Brain Rot Mode</button>
+    <button id="superBrainRotButton">🤯 Super Brainrot Mode</button>
+    
+    <label for="minutesInput">How much time needs to pass (mins):</label>
+    <input type="text" id="minutesInput" placeholder="e.g. 10:00">
+    
+    <!-- New speed input for km/h -->
+    <div class="speed-container">
+      <label for="speedInput">Speed (km/h):</label>
+      <input type="number" id="speedInput" placeholder="e.g. 10" step="0.1">
+    </div>
+    
+    <!-- Add-time buttons -->
+    <div class="add-time-container">
+      <button id="add10Button">+10 min</button>
+      <button id="add5Button">+5 min</button>
+      <button id="add1Button">+1 min</button>
+    </div>
+    
+    <label for="scoreInterval" class="dropdown-label">How often do you require a dopamine boost?</label>
+    <select id="scoreInterval">
+      <option value="1">Every 1 second</option>
+      <option value="5">Every 5 seconds</option>
+      <option value="15">Every 15 seconds</option>
+      <option value="30" selected>Every 30 seconds</option>
+      <option value="60">Every 1 minute</option>
+      <option value="300">Every 5 minutes</option>
+    </select>
+    
+    <div class="button-container">
+      <button id="startButton">Start</button>
+      <button id="pauseButton" disabled>Pause</button>
+      <button id="resetButton" disabled>End</button>
+    </div>
+    
+    <div id="timerDisplay">00:00:000</div>
+    <!-- Live distance display -->
+    <div id="distanceDisplay">Distance Covered: 0.00000 km</div>
+    
+    <!-- Motivational message overlay -->
+    <div id="motivationalMessage">
+      <div id="motivationalText"></div>
+      <div id="motivationalStats"></div>
+    </div>
+    
+    <!-- Charts container -->
+    <div class="charts-container">
+      <div class="chart-wrapper">
+        <div id="intervalPie" class="pie-chart"></div>
+        <div class="chart-caption">Interval Progress</div>
+      </div>
+      <div class="chart-wrapper">
+        <div id="overallPie" class="pie-chart">
+          <span id="completedScore" class="score"></span>
+          <span id="remainingScore" class="score"></span>
+        </div>
+        <div class="chart-caption">Scoreboard</div>
+      </div>
+    </div>
+    
+    <!-- Saved Runs Open Button placed as a fixed overlay button -->
+    <button id="openSavedRunsButton" title="View Saved Runs" style="position: fixed; top: 20px; left: 20px; font-size: 1.3rem; z-index: 1100; background: rgba(255, 255, 255, 0.9); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+      💾
+    </button>
+    <button id="pipButton" title="Picture in Picture" style="position: fixed; top: 20px; right: 20px; font-size: 1.3rem; z-index: 1100; background: rgba(255, 255, 255, 0.9); border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+      📱
+    </button>
+  </div>
+  
+  <!-- Saved Runs Modal Overlay -->
+  <div id="savedRunsOverlay">
+    <div id="savedRunsModal">
+      <button id="closeSavedRunsButton" title="Close Saved Runs">Close</button>
+      <div id="savedRunsContent">
+        <table id="savedRunsTable">
+          <thead>
+            <tr>
+              <th data-key="date">Date</th>
+              <th data-key="timer">Timer (MM:SS)</th>
+              <th data-key="speed">Speed (km/h)</th>
+              <th data-key="distance">Distance (km)</th>
+            </tr>
+          </thead>
+          <tbody id="savedRunsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    /***********************
+     * Utility Functions
+     ***********************/
+    
+    // Formats a given number of milliseconds into "MM:SS" format.
+    function formatTime(ms) {
+      const mins = Math.floor(ms / 60000);
+      const secs = Math.floor((ms % 60000) / 1000);
+      return String(mins).padStart(2, '0') + ":" + String(secs).padStart(2, '0');
+    }
+    
+    // Parses a time input value which can be in "MM:SS" format or just minutes.
+    function parseTimeInput(value) {
+      if (value.includes(":")) {
+        const parts = value.split(":");
+        const mins = parseInt(parts[0], 10);
+        const secs = parseInt(parts[1], 10) || 0;
+        return mins + secs / 60;
+      } else {
+        return parseFloat(value);
+      }
+    }
+    
+    /***********************
+     * Global Timer Variables
+     ***********************/
+    
+    let timerInterval = null;
+    let totalTimeMs = 0;
+    let timeLeftMs = 0;
+    let intervalMs = 30000; // Set by the dropdown (in milliseconds)
+    let totalIncrements = 0;
+    const tickMs = 50; // Update interval (ms)
+    let lastCompletedInterval = 0;
+    let halfwayTriggered = false;
+    let deleteModeTimeoutId = null;
+    let currentSpeed = 0;
+    let currentSort = { column: "date", direction: "desc" };
+    
+    /***********************
+     * Mode Flags and Settings
+     ***********************/
+    
+    let brainRotActive = false;
+    let superBrainRotActive = false;
+    
+    // Background colors for the main container (panel)
+    const normalContainerBG = "rgba(255, 255, 255, 0.95)"; // Default
+    const transparentContainerBG = "rgba(255, 255, 255, 0.3)"; // When brain rot mode is active
+    
+    // Updates the main container's background color and applies text style if a brain rot mode is active.
+    function updatePanelTransparency() {
+      if (brainRotActive || superBrainRotActive) {
+        containerEl.style.backgroundColor = transparentContainerBG;
+        containerEl.classList.add("brainrot-active");
+      } else {
+        containerEl.style.backgroundColor = normalContainerBG;
+        containerEl.classList.remove("brainrot-active");
+      }
+    }
+    
+    // Inject CSS for black text with a white outline when brain rot mode is active.
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .brainrot-active, .brainrot-active * {
+        color: black !important;
+        text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    /***********************
+     * DOM Element References
+     ***********************/
+    
+    const startButton = document.getElementById('startButton');
+    const pauseButton = document.getElementById('pauseButton');
+    const resetButton = document.getElementById('resetButton');
+    const minutesInput = document.getElementById('minutesInput');
+    const scoreIntervalSelect = document.getElementById('scoreInterval');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const intervalPie = document.getElementById('intervalPie');
+    const overallPie = document.getElementById('overallPie');
+    const completedScoreEl = document.getElementById('completedScore');
+    const remainingScoreEl = document.getElementById('remainingScore');
+    const motivationalMessageEl = document.getElementById('motivationalMessage');
+    const motivationalTextEl = document.getElementById('motivationalText');
+    const motivationalStatsEl = document.getElementById('motivationalStats');
+    const containerEl = document.getElementById('mainContainer');
+    const brainRotButton = document.getElementById('brainRotButton');
+    const superBrainRotButton = document.getElementById('superBrainRotButton');
+    const backgroundVideo = document.getElementById('backgroundVideo');
+    const superBackground = document.getElementById('superBackground');
+    const speedInput = document.getElementById('speedInput');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+    const victoryAudio = new Audio('https://www.myinstants.com/media/sounds/final-fantasy-vii-victory-fanfare-1.mp3');
+    const halfwayAudio = new Audio('https://www.myinstants.com/media/sounds/livin_on_a_prayer.mp3');
+    
+    /***********************
+     * Data Arrays
+     ***********************/
+    
+    // Motivational phrases array.
+    const motivationalPhrases = [
+      "Great job!", "Well done!", "Keep going!", "You rock!", "Fantastic!",
+      "Awesome!", "Brilliant!", "Superb!", "Smashing it!", "Way to go!",
+      "Excellent!", "Keep it up!", "Impressive!", "Outstanding!", "Nice work!",
+      "Push on!", "Almost there!", "You're a star!", "Crushing it!", "Keep rocking!",
+      "On fire!", "Incredible!", "Pace yourself!", "Legendary!", "Top notch!",
+      "Dazzling!", "Epic effort!", "Marvelous!", "Keep moving!", "Unstoppable!",
+      "Rock on!", "Thrive on!", "Win big!", "Phenomenal!", "Remarkable!",
+      "Go for it!", "Keep up!", "You got this!", "Keep pushing!", "Stay strong!",
+      "Full steam!",
+      "HOLY SMOKES, YOU'RE ON FIRE!",
+      "INSANE, YOU'RE A SUPERHERO!",
+      "UNBELIEVABLE, YOU'VE JUST ACHIEVED GREATNESS!",
+      "STELLAR, YOU'RE OUT OF THIS WORLD!"
+    ];
+    
+    // Emoji choices for fireworks.
+    const emojiChoices = ["👍", "💪", "🏅", "💨", "🔥", "🎖️", "👏", "🤩"];
+    
+    // Array of YouTube video IDs (only these two are used).
+    const videoIDs = ["KoFS6PDkqFs", "WA6ePGoJ6Mk"];
+    
+    /***********************
+     * Timer and Distance Functions
+     ***********************/
+    
+    // Adds a specified number of minutes to the timer and updates the display.
+    function addTime(minutesToAdd) {
+      const additionalMs = minutesToAdd * 60000;
+      totalTimeMs += additionalMs;
+      timeLeftMs += additionalMs;
+      totalIncrements = totalTimeMs / intervalMs;
+      minutesInput.value = formatTime(timeLeftMs);
+      updateDisplay();
+    }
+    
+    // Event listeners for add-time buttons.
+    document.getElementById('add10Button').addEventListener('click', function() {
+      addTime(10);
+    });
+    document.getElementById('add5Button').addEventListener('click', function() {
+      addTime(5);
+    });
+    document.getElementById('add1Button').addEventListener('click', function() {
+      addTime(1);
+    });
+    
+    /***********************
+     * Brain Rot Mode Functionality
+     ***********************/
+    
+    // Toggles the normal Brain Rot Mode (single video background).
+    brainRotButton.addEventListener('click', function() {
+      if (superBrainRotActive) disableSuperBrainRotMode(); // Ensure Super mode is off.
+      if (!brainRotActive) {
+        const randomStart = Math.floor(Math.random() * 300);
+        const videoId = videoIDs[Math.floor(Math.random() * videoIDs.length)];
+        backgroundVideo.src = "https://www.youtube.com/embed/" + videoId +
+          "?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=" + videoId +
+          "&start=" + randomStart;
+        backgroundVideo.style.display = "block";
+        brainRotActive = true;
+        brainRotButton.textContent = "Disable 🤪 Brain Rot Mode";
+      } else {
+        disableBrainRotMode();
+      }
+      updatePanelTransparency();
+    });
+    
+    // Disables normal Brain Rot Mode.
+    function disableBrainRotMode() {
+      backgroundVideo.style.display = "none";
+      backgroundVideo.src = "";
+      brainRotActive = false;
+      brainRotButton.textContent = "Enable 🤪 Brain Rot Mode";
+    }
+    
+    /***********************
+     * Super Brainrot Mode Functionality
+     ***********************/
+    
+    // Toggles the Super Brainrot Mode (four-video grid background).
+    superBrainRotButton.addEventListener('click', function() {
+      if (brainRotActive) disableBrainRotMode(); // Ensure normal mode is off.
+      if (!superBrainRotActive) {
+        superBackground.innerHTML = "";
+        // Create 4 iframes for the grid.
+        for (let i = 0; i < 4; i++) {
+          const iframe = document.createElement('iframe');
+          const videoId = videoIDs[Math.floor(Math.random() * videoIDs.length)];
+          const randomStart = Math.floor(Math.random() * 300);
+          iframe.src = "https://www.youtube.com/embed/" + videoId +
+            "?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=" + videoId +
+            "&start=" + randomStart;
+          iframe.allow = "autoplay; encrypted-media";
+          iframe.setAttribute("playsinline", "");
+          // Ensure the video fills the cell (cover)
+          iframe.style.pointerEvents = "none";
+          iframe.style.width = "100%";
+          iframe.style.height = "100%";
+          iframe.style.objectFit = "cover";
+          superBackground.appendChild(iframe);
+        }
+        superBackground.style.display = "grid";
+        superBrainRotActive = true;
+        superBrainRotButton.textContent = "Disable 🤯 Super Brainrot Mode";
+      } else {
+        disableSuperBrainRotMode();
+      }
+      updatePanelTransparency();
+    });
+    
+    // Disables Super Brainrot Mode.
+    function disableSuperBrainRotMode() {
+      superBackground.style.display = "none";
+      superBackground.innerHTML = "";
+      superBrainRotActive = false;
+      superBrainRotButton.textContent = "Enable 🤯 Super Brainrot Mode";
+    }
+    
+    /***********************
+     * Timer Control Functions
+     ***********************/
+    
+    // Event listener for the Start button.
+    startButton.addEventListener('click', function() {
+      const timeInMinutes = parseTimeInput(minutesInput.value);
+      
+      if (isNaN(timeInMinutes) || timeInMinutes <= 0) {
+        alert('Please enter a valid time.');
+        return;
+      }
+
+      // Remove the immediate audio unlocking
+      // Only initialize the audio elements without playing them
+      victoryAudio.load();
+      halfwayAudio.load();
+
+      const scoreIntervalValue = parseInt(scoreIntervalSelect.value, 10);
+      intervalMs = scoreIntervalValue * 1000;
+      const initialTimeInMs = timeInMinutes * 60 * 1000; // save original timer value
+      totalTimeMs = initialTimeInMs;
+      timeLeftMs = initialTimeInMs;
+      totalIncrements = totalTimeMs / intervalMs;
+      lastCompletedInterval = 0;
+      currentSpeed = parseFloat(speedInput.value) || 0; // save original speed in global variable
+      
+      updateDisplay();
+      // Disable inputs while timer is running.
+      startButton.disabled = true;
+      minutesInput.disabled = true;
+      scoreIntervalSelect.disabled = true;
+      pauseButton.disabled = false;
+      resetButton.disabled = false;
+      pauseButton.textContent = 'Pause';
+      
+      timerInterval = setInterval(function() {
+        timeLeftMs -= tickMs;
+        if (timeLeftMs <= 0) {
+          timeLeftMs = 0;
+          clearInterval(timerInterval);
+          timerInterval = null;
+          
+          // Make sure audio is loaded and play it
+          victoryAudio.load();
+          victoryAudio.currentTime = 0;
+          victoryAudio.play().catch(error => {
+            console.log("Failed to play victory audio:", error);
+          });
+          
+          // Show final motivational message
+          triggerMotivation(Math.floor(totalTimeMs / intervalMs));
+          
+          // Reset UI state
+          startButton.disabled = false;
+          pauseButton.disabled = true;
+          resetButton.disabled = true;
+          minutesInput.disabled = false;
+          scoreIntervalSelect.disabled = false;
+          
+          // Save run data when the timer finishes
+          const now = new Date();
+          const finalDate = now.toLocaleDateString() + " " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const formattedTimer = formatTime(initialTimeInMs);
+          const calculatedDistance = ((initialTimeInMs / 3600000) * currentSpeed).toFixed(2);
+          const runData = {
+            date: finalDate,
+            timestamp: now.getTime(),
+            timer: formattedTimer,
+            speed: currentSpeed,
+            distance: calculatedDistance
+          };
+          saveRun(runData);
+        }
+        updateDisplay();
+      }, tickMs);
+    });
+    
+    // Event listener for the Pause button.
+    pauseButton.addEventListener('click', function() {
+      if (timerInterval) {
+        // Pausing
+        clearInterval(timerInterval);
+        timerInterval = null;
+        pauseButton.textContent = 'Resume';
+      } else if (timeLeftMs > 0) {
+        // Resuming
+        timerInterval = setInterval(function() {
+          timeLeftMs -= tickMs;
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            
+            // Add victory sound here too
+            victoryAudio.load();
+            victoryAudio.currentTime = 0;
+            victoryAudio.play().catch(error => {
+              console.log("Failed to play victory audio:", error);
+            });
+            
+            // Show final motivational message
+            triggerMotivation(Math.floor(totalTimeMs / intervalMs));
+            
+            // Reset UI state
+            startButton.disabled = false;
+            pauseButton.disabled = true;
+            resetButton.disabled = true;
+            minutesInput.disabled = false;
+            scoreIntervalSelect.disabled = false;
+          }
+          updateDisplay();
+        }, tickMs);
+        pauseButton.textContent = 'Pause';
+      }
+    });
+    
+    // Event listener for the End button.
+    resetButton.addEventListener('click', function() {
+      // Stop the timer if it's running.
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+
+      // Calculate elapsed time and distance.
+      let elapsedTimeMs = totalTimeMs - timeLeftMs;
+      let formattedTimer = formatTime(elapsedTimeMs);
+      let calculatedDistance = ((elapsedTimeMs / 3600000) * currentSpeed).toFixed(2);
+      const now = new Date();
+      const finalDate = now.toLocaleDateString() + " " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const runData = {
+        date: finalDate,
+        timestamp: now.getTime(),  // added for sorting by date
+        timer: formattedTimer,
+        speed: currentSpeed,
+        distance: calculatedDistance
+      };
+      // Save the run even if prematurely ended.
+      saveRun(runData);
+
+      // Turn off any active modes.
+      if (brainRotActive) disableBrainRotMode();
+      if (superBrainRotActive) disableSuperBrainRotMode();
+
+      // Reset all inputs and variables.
+      totalTimeMs = 0;
+      timeLeftMs = 0;
+      updateDisplay();
+      minutesInput.value = "";
+      speedInput.value = "";
+      startButton.disabled = false;
+      pauseButton.disabled = true;
+      resetButton.disabled = true;
+      minutesInput.disabled = false;
+      scoreIntervalSelect.disabled = false;
+      pauseButton.textContent = 'Pause';
+      updatePanelTransparency();
+      halfwayTriggered = false;
+      currentSpeed = 0;
+      // Reset the interval pie and overall scoreboard to 0-0.
+      intervalPie.style.background = "conic-gradient(#ddd 0deg, #ddd 360deg)";
+      overallPie.style.background = "conic-gradient(#ddd 0deg, #ddd 360deg)";
+      completedScoreEl.textContent = "0";
+      remainingScoreEl.textContent = "0";
+    });
+    
+    /***********************
+     * Update Display and Distance Calculation
+     ***********************/
+    
+    function updateDisplay() {
+      // Update timer display in MM:SS:MS format.
+      const mins = Math.floor(timeLeftMs / 60000);
+      const secs = Math.floor((timeLeftMs % 60000) / 1000);
+      const ms = timeLeftMs % 1000;
+      timerDisplay.textContent =
+         String(mins).padStart(2, '0') + ':' +
+         String(secs).padStart(2, '0') + ':' +
+         String(ms).padStart(3, '0');
+      // Mirror the top input with remaining time in MM:SS.
+      minutesInput.value = totalTimeMs ? formatTime(timeLeftMs) : "";
+      
+      // Update live distance covered based on elapsed time and speed (km/h).
+      const elapsedTimeMs = totalTimeMs - timeLeftMs;
+      const elapsedHours = elapsedTimeMs / 3600000; // Convert ms to hours.
+      const speed = parseFloat(speedInput.value) || 0;
+      const distance = elapsedHours * speed;
+      distanceDisplay.innerText = "Distance Covered: " + distance.toFixed(5) + " km";
+      
+      if (totalTimeMs > 0) {
+        // Update interval pie chart.
+        const elapsedInCurrentInterval = elapsedTimeMs % intervalMs;
+        const progress = elapsedInCurrentInterval / intervalMs;
+        const angle = progress * 360;
+        intervalPie.style.background = `conic-gradient(#007BFF 0deg, #007BFF ${angle}deg, #ddd ${angle}deg, #ddd 360deg)`;
+        
+        // Update overall progress scoreboard.
+        const completedIncrements = Math.floor(elapsedTimeMs / intervalMs);
+        const remainingIncrements = Math.max(totalIncrements - completedIncrements, 0);
+        const overallAngle = (completedIncrements / totalIncrements) * 360;
+        overallPie.style.background = `conic-gradient(#28a745 0deg, #28a745 ${overallAngle}deg, #dc3545 ${overallAngle}deg, #dc3545 360deg)`;
+        
+        // Update scoreboard numbers.
+        completedScoreEl.textContent = completedIncrements;
+        remainingScoreEl.textContent = remainingIncrements;
+        
+        // Calculate dynamic font sizes for scoreboard (increased sizes due to 20% scaling).
+        const calcFontSize = (value) => {
+          // Base size is 14.4px and maximum is 43.2px.
+          const base = 14.4;
+          const max = 43.2;
+          const ratio = Math.min(Math.max(value, 0), totalIncrements) / totalIncrements;
+          return base + (max - base) * ratio;
+        };
+        completedScoreEl.style.fontSize = calcFontSize(completedIncrements).toFixed(0) + "px";
+        remainingScoreEl.style.fontSize = calcFontSize(remainingIncrements).toFixed(0) + "px";
+        
+        // Trigger motivational message if a new interval is reached.
+        if (completedIncrements > lastCompletedInterval) {
+          triggerMotivation(completedIncrements);
+          lastCompletedInterval = completedIncrements;
+        }
+      }
+    }
+    
+    /***********************
+     * Motivational Message and Fireworks
+     ***********************/
+    
+    function triggerMotivation(completedIntervals) {
+      if (totalTimeMs === 0) return;
+      
+      const ratio = (totalTimeMs - timeLeftMs) / totalTimeMs;
+      const donePercent = (ratio * 100).toFixed(2);
+      const remainingPercent = (100 - ratio * 100).toFixed(2);
+      
+      // Calculate current distance
+      const elapsedTimeHours = (totalTimeMs - timeLeftMs) / 3600000;
+      const currentDistance = (elapsedTimeHours * currentSpeed).toFixed(2);
+      
+      let phrase;
+      if (!halfwayTriggered && ratio >= 0.5) {
+        phrase = "WHOA WE'RE HALFWAY THERE";
+        halfwayAudio.currentTime = 0;
+        halfwayAudio.play().catch(error => console.log("Failed to play halfway audio:", error));
+        halfwayTriggered = true;
+      } else {
+        phrase = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+      }
+      
+      // Show the message immediately
+      motivationalMessageEl.style.display = 'block';
+      motivationalTextEl.textContent = phrase;
+      motivationalStatsEl.innerHTML = `${donePercent}% done   ${remainingPercent}% left<br>Distance: ${currentDistance} km`;
+      motivationalMessageEl.style.opacity = 1;
+      
+      // Trigger fireworks
+      triggerFireworks(3000); // Match the display duration
+      
+      // Remove everything after 3 seconds
+      setTimeout(() => {
+        motivationalMessageEl.style.opacity = 0;
+        motivationalMessageEl.style.display = 'none';
+        document.querySelectorAll('.firework').forEach(fw => fw.remove());
+      }, 3000);
+    }
+    
+    function triggerFireworks(duration) {
+      for (let i = 0; i < 40; i++) {
+        const firework = document.createElement('div');
+        if (Math.random() < 0.5) {
+          firework.textContent = emojiChoices[Math.floor(Math.random() * emojiChoices.length)];
+          firework.classList.add('firework', 'emoji-firework');
+        } else {
+          firework.classList.add('firework');
+          const colors = ['#ff3838', '#ff9f1a', '#ffbe40', '#18dcff', '#5f27cd', '#6ab04c'];
+          firework.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        }
+        const rect = containerEl.getBoundingClientRect();
+        firework.style.left = Math.random() * rect.width + 'px';
+        firework.style.top = Math.random() * rect.height + 'px';
+        containerEl.appendChild(firework);
+        setTimeout(() => {
+          firework.remove();
+        }, duration);
+      }
+    }
+    
+    /***********************
+     * Saved Runs Functions
+     ***********************/
+    
+    // Retrieve the saved runs array from localStorage.
+    function getSavedRuns() {
+      let runs = localStorage.getItem("savedRuns");
+      if (!runs) return [];
+      try {
+          runs = JSON.parse(runs);
+      } catch(e) {
+          runs = [];
+      }
+      return runs;
+    }
+    
+    // Save a new run to localStorage and update the display.
+    function saveRun(run) {
+      let runs = getSavedRuns();
+      runs.push(run);
+      localStorage.setItem("savedRuns", JSON.stringify(runs));
+      renderSavedRuns();
+    }
+    
+    // Delete a run by index and update the display.
+    function deleteRun(index) {
+      let runs = getSavedRuns();
+      if (index >= 0 && index < runs.length) {
+        runs.splice(index, 1);
+        localStorage.setItem("savedRuns", JSON.stringify(runs));
+        renderSavedRuns(); // Re-render the table
+      }
+    }
+    
+    // Render the saved runs into the savedRunsList <ul>.
+    function renderSavedRuns() {
+      const tbody = document.getElementById("savedRunsBody");
+      tbody.innerHTML = "";
+      let runs = getSavedRuns();
+      
+      // Add original indices before sorting
+      runs = runs.map((run, index) => ({...run, originalIndex: index}));
+      
+      // Sort runs based on currentSort criteria
+      runs.sort((a, b) => {
+        let cmp = 0;
+        if (currentSort.column === "date") {
+          const timeA = a.timestamp || new Date(a.date).getTime();
+          const timeB = b.timestamp || new Date(b.date).getTime();
+          cmp = timeA - timeB;
+        } else if (currentSort.column === "timer") {
+          let aParts = a.timer.split(":");
+          let bParts = b.timer.split(":");
+          let aSec = parseInt(aParts[0], 10) * 60 + parseInt(aParts[1], 10);
+          let bSec = parseInt(bParts[0], 10) * 60 + parseInt(bParts[1], 10);
+          cmp = aSec - bSec;
+        } else {
+          cmp = parseFloat(a[currentSort.column]) - parseFloat(b[currentSort.column]);
+        }
+        return currentSort.direction === "asc" ? cmp : -cmp;
+      });
+
+      runs.forEach((run) => {
+        const tr = document.createElement("tr");
+        
+        // Create normal view cells
+        const tdDate = document.createElement("td");
+        tdDate.textContent = run.date;
+        const tdTimer = document.createElement("td");
+        tdTimer.textContent = run.timer;
+        const tdSpeed = document.createElement("td");
+        tdSpeed.textContent = run.speed;
+        const tdDistance = document.createElement("td");
+        tdDistance.textContent = parseFloat(run.distance).toFixed(2);
+
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTimer);
+        tr.appendChild(tdSpeed);
+        tr.appendChild(tdDistance);
+
+        // Add click handler to row
+        tr.addEventListener("click", function(e) {
+          if (!this.classList.contains("delete-mode")) {
+            // Enter delete mode
+            e.stopPropagation();
+            const oldContent = this.innerHTML;
+            this.classList.add("delete-mode");
+            
+            // Create delete confirmation cell
+            const td = document.createElement("td");
+            td.setAttribute("colspan", "4");
+            td.style.textAlign = "center";
+            
+            const deleteButton = document.createElement("button");
+            deleteButton.textContent = "Tap to Delete";
+            deleteButton.style.width = "100%";
+            deleteButton.style.padding = "1rem";
+            deleteButton.style.backgroundColor = "#dc3545";
+            deleteButton.style.border = "none";
+            deleteButton.style.color = "white";
+            deleteButton.style.fontSize = "1rem";
+            deleteButton.style.cursor = "pointer";
+            
+            // Use the originalIndex stored in the run object
+            deleteButton.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              deleteRun(run.originalIndex);
+              return false;
+            };
+            
+            td.appendChild(deleteButton);
+            this.innerHTML = "";
+            this.appendChild(td);
+            
+            // Auto-cancel delete mode after 3 seconds
+            setTimeout(() => {
+              if (this.classList.contains("delete-mode")) {
+                this.classList.remove("delete-mode");
+                this.innerHTML = oldContent;
+              }
+            }, 3000);
+          }
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+    
+    // Global click handler: If a click occurs outside a delete button, cancel delete mode.
+    document.addEventListener("click", function(e) {
+      // Check if any row is currently in delete mode.
+      if (document.querySelector("#savedRunsTable tr.delete-mode")) {
+        // If the click target is not a delete button, cancel delete mode.
+        if (!e.target.closest("button")) {
+          if (deleteModeTimeoutId) {
+            clearTimeout(deleteModeTimeoutId);
+            deleteModeTimeoutId = null;
+          }
+          renderSavedRuns();
+        }
+      }
+    });
+
+    // Wrap event listener bindings in a DOMContentLoaded event handler
+    document.addEventListener("DOMContentLoaded", function() {
+      // Event listener for opening the Saved Runs modal
+      document.getElementById("openSavedRunsButton").addEventListener("click", function() {
+        document.getElementById("savedRunsOverlay").style.display = "block";
+        renderSavedRuns();
+      });
+
+      // Event listener for closing the Saved Runs modal
+      document.getElementById("closeSavedRunsButton").addEventListener("click", function() {
+        document.getElementById("savedRunsOverlay").style.display = "none";
+      });
+
+      // Add click event listeners to table headers for sorting (attach only once)
+      document.querySelectorAll("#savedRunsTable th").forEach(th => {
+        th.style.cursor = "pointer";
+        th.addEventListener("click", function(){
+          let key = this.getAttribute("data-key");
+          if (currentSort.column === key) {
+              currentSort.direction = (currentSort.direction === "asc") ? "desc" : "asc";
+          } else {
+              currentSort.column = key;
+              currentSort.direction = (key === "date" ? "desc" : "asc");
+          }
+          renderSavedRuns();
+        });
+      });
+
+      // Picture in Picture functionality
+      const pipButton = document.getElementById('pipButton');
+      
+      // Check if Picture-in-Picture is supported
+      if ('documentPictureInPicture' in window || 'pictureInPictureEnabled' in document) {
+        pipButton.addEventListener('click', async function() {
+          try {
+            if (document.pictureInPictureElement) {
+              await document.exitPictureInPicture();
+            } else {
+              // Create a video element for PiP (required for older Android versions)
+              const video = document.createElement('video');
+              video.srcObject = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                  displaySurface: 'browser',
+                },
+              });
+              video.autoplay = true;
+              
+              // Start Picture-in-Picture
+              await video.requestPictureInPicture();
+              
+              // Clean up when PiP is closed
+              video.addEventListener('leavepictureinpicture', () => {
+                video.srcObject.getTracks().forEach(track => track.stop());
+              });
+            }
+          } catch (err) {
+            console.error('Failed to enter Picture-in-Picture mode:', err);
+            alert('Picture-in-Picture mode failed. Your device may not support this feature.');
+          }
+        });
+      } else {
+        pipButton.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
